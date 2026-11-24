@@ -1,7 +1,7 @@
 # Recuerda
 
-Aplicación de recordatorios pensada para el móvil. Se instala como aplicación
-(PWA), funciona sin conexión, guarda todo en el propio dispositivo y avisa con
+Agenda de recordatorios para el móvil. Se instala como aplicación (PWA),
+funciona sin conexión, guarda todo en el propio dispositivo y avisa con
 notificaciones del sistema.
 
 ## Puesta en marcha
@@ -24,6 +24,42 @@ Para generar la versión de producción:
 npm run build
 ```
 
+## Cómo está pensada
+
+**Una sola pantalla.** No hay barra de pestañas. Arriba la fecha y tres tramos
+(Hoy, Próximos, Hechos); en medio la agenda; abajo una barra donde se escribe.
+Buscar, calendario y ajustes son tres iconos en la cabecera. Todo lo demás
+ocurre en hojas que se superponen, así que nunca se pierde el sitio.
+
+**Escribir es la forma principal de crear.** En vez de un botón flotante que
+abre un formulario, hay una barra fija abajo: escribes *"Pagar el alquiler cada
+mes urgente"* y, mientras escribes, la aplicación enseña en una línea lo que ha
+entendido (fecha, hora, repetición, prioridad, categoría).
+
+Desde ahí salen **dos caminos, los dos siempre a la vista**: la flecha lo añade
+al momento, y **Configurar** abre la ficha con el nombre ya puesto para elegir
+cuándo, cada cuánto y lo demás antes de añadirlo. Si se cancela, lo escrito
+sigue en la barra. Con la barra vacía, Configurar abre una ficha en blanco.
+
+**Editar pone "Editar".** Cada línea de la agenda lleva sus acciones escritas
+debajo — *Editar* y *Posponer* — en vez de confiar en que alguien adivine que
+tocando el título se abre la ficha (que también).
+
+**Lo atrasado no se esconde.** Si algo venció ayer y sigue sin hacerse, aparece
+en "Hoy", en su propio bloque, con una barra terracota al margen. Es el único
+sitio donde la aplicación usa color.
+
+## Diseño
+
+Dirección editorial, como una agenda de papel: fondo de papel cálido, tinta
+casi negra, un único acento terracota reservado para lo que vence ahora, y un
+verde salvia apagado para lo hecho. Sin degradados, sin sombras de color, sin
+tarjetas. La jerarquía la llevan la tipografía (Fraunces para las fechas, Inter
+para la interfaz) y las líneas de un píxel entre filas.
+
+Todos los valores viven en [`src/estilos/tokens.css`](src/estilos/tokens.css),
+en OKLCH. El tema oscuro es tinta cálida, nunca negro puro.
+
 ## Instalación en el móvil
 
 Las notificaciones son mucho más fiables con la aplicación instalada:
@@ -41,8 +77,8 @@ Si la subes a un hosting, asegúrate de que tenga certificado.
 ## Cómo llegan los avisos
 
 No hay servidor ni cuenta: todo ocurre en el dispositivo. La aplicación combina
-cuatro estrategias y usa la mejor que soporte cada navegador, y en Ajustes se
-puede ver cuáles están disponibles:
+cuatro estrategias y usa la mejor que soporte cada navegador. En Ajustes se ve
+cuáles están disponibles en ese móvil concreto:
 
 1. **Notification Triggers**: el sistema operativo se queda con el aviso
    programado y lo lanza a la hora exacta aunque el navegador esté cerrado. Es
@@ -61,46 +97,56 @@ aplicación; la acción se aplica en cuanto se vuelve a abrir.
 
 ## Qué se puede hacer
 
-**Crear recordatorios**
+**Crear**
 
-- Escribiendo una frase normal: *"Llamar a Ana mañana a las 9 urgente"* o
-  *"Pagar el alquiler cada mes"*. Se reconocen fecha, hora, repetición,
-  prioridad, etiquetas (`#casa`) y hasta la categoría.
-- Con plantillas de un toque: medicación, agua, basura, recibos, gimnasio...
-- Con el formulario completo, para afinarlo todo.
+- Escribiendo una frase normal. Se reconocen fecha (*mañana*, *el lunes*, *el
+  15 de marzo*, *en 3 días*), hora (*a las 9*, *a las 18:30*), repetición
+  (*cada día*, *cada martes*, *cada mes*, *cada 3 días*), repeticiones de
+  varias tomas (*3 veces al día*, que admite *a las 10* para recolocarlas),
+  franjas (*cada 2 horas de 8 a 22*), prioridad (*urgente*, *importante*),
+  etiquetas (`#casa`) y la categoría.
+- Con la ficha completa, para afinarlo todo.
 
 **Repeticiones**
 
-Cada X horas, diaria, de lunes a viernes, fines de semana, días concretos de la
-semana, mensual (con día del mes fijo), anual y personalizada (cada N días,
-semanas, meses o años). Con final abierto, hasta una fecha o tras un número de
-veces. Al completar una ocurrencia, la siguiente se programa sola.
+Seis frecuencias a la vista, cada una con su explicación y sin nada escondido
+detrás de un desplegable: una sola vez, cada día, días concretos de la semana,
+cada mes, cada año y cada pocas horas. Todas llevan un contador al lado, así
+que *cada 3 días* o *cada 2 semanas* se ponen con dos toques.
 
-**Organización**
+Encima de eso, **varias horas al día**. Se añaden las que hagan falta, o se
+cogen de un atajo (2, 3, 4 o 6 veces), y se combinan con la frecuencia. De ahí
+salen cosas como *cada 2 días a las 8:00 y a las 20:00* o *los lunes, miércoles
+y viernes a las 7:30 y a las 19:00*.
 
-Dieciocho categorías con icono y color, cuatro prioridades, etiquetas libres,
-subtareas con progreso, notas, enlace, lugar y recordatorios destacados.
+La repetición por horas se puede limitar a una franja — *cada 2 horas, de 8:00
+a 22:00* — para que no avise de madrugada. La franja puede cruzar la medianoche
+si lo que hace falta es justo lo contrario.
+
+Al pie del editor se ven siempre los próximos días con sus horas de verdad. Es
+la forma rápida de comprobar que la regla dice lo que se quería decir, sin
+guardar y esperar a ver qué pasa.
+
+Con final abierto, hasta una fecha o tras un número de veces. Al completar una
+ocurrencia, la siguiente se programa sola; si es la última del día, salta al
+siguiente día activo.
+
+**Organizar**
+
+Ocho categorías con su punto de color, tres prioridades, etiquetas libres,
+subtareas con progreso, notas, enlace y lugar.
 
 **Avisos**
 
-Varios avisos previos por recordatorio (desde 5 minutos hasta una semana antes),
-posposición rápida o a una hora concreta, aviso insistente que no se va hasta
-atenderlo, aviso silencioso y franja de "no molestar" nocturna.
-
-**Vistas**
-
-- **Hoy**: resumen del día, atrasados, lo de hoy y los próximos tres días.
-- **Agenda**: todo, con búsqueda y filtros por categoría, prioridad y etiqueta.
-- **Calendario**: mes completo con puntos de color, incluidas las repeticiones
-  futuras calculadas al vuelo.
-- **Resumen**: pendientes, gráfico de los últimos siete días, puntualidad,
-  rachas y reparto por categoría.
-- **Ajustes**: notificaciones, diagnóstico, apariencia y copias de seguridad.
+Varios avisos previos por recordatorio (desde 10 minutos hasta una semana
+antes), posposición rápida o a una hora concreta, aviso insistente que no se va
+hasta atenderlo, aviso silencioso y franja de "no molestar" nocturna.
 
 **Otros detalles**
 
-Tema claro, oscuro o automático; siete colores principales; deshacer la última
-acción; sonido sintetizado y vibración; funciona sin conexión.
+Tema claro, oscuro o automático; búsqueda; calendario mensual con las
+repeticiones futuras calculadas al vuelo; resumen de los últimos siete días
+dentro de "Hechos"; deshacer la última acción; funciona sin conexión.
 
 ## Calendario y Google Calendar
 
@@ -112,8 +158,8 @@ cubren el mismo caso de uso:
   las repeticiones (`RRULE`) y los avisos (`VALARM`) ya incluidos. Se importa en
   Google Calendar desde *Configuración › Importar y exportar › Importar*, y
   también vale para Outlook o el calendario del móvil.
-- **Añadir a Google Calendar** (en cualquier recordatorio, dentro de "Más
-  opciones"): abre el formulario de Google con todos los datos rellenos.
+- **Añadir a Google Calendar** (en cualquier recordatorio, dentro de
+  "Detalles"): abre el formulario de Google con todos los datos rellenos.
 
 ## Copias de seguridad
 
@@ -131,28 +177,37 @@ public/
   iconos/                   Iconos de la aplicación
 src/
   main.jsx                  Punto de entrada
-  App.jsx                   Reparto de vistas y coordinación general
+  App.jsx                   La pantalla única y las hojas
   contexto/
     ContextoRecordatorios    Estado global (useReducer + localStorage)
   hooks/
     useNotificaciones        Cálculo y programación de los avisos
   componentes/
-    Cabecera, NavegacionInferior, TarjetaRecordatorio, ListaRecordatorios,
-    HojaModal, FormularioRecordatorio, EditorRepeticion, HojaPosponer,
-    Bienvenida, Avisos, VistaHoy, VistaAgenda, VistaCalendario,
-    VistaResumen, VistaAjustes, Icono
+    CabeceraDiario           Fecha, estado del día y los tres tramos
+    Compositor               Barra de escribir del pie, con lectura en vivo
+    FilaRecordatorio         Una línea de la agenda
+    ListaDiario              Lista, con agrupación por día
+    PanelHechos              Resumen compacto dentro de "Hechos"
+    VistaCalendario          Mes completo
+    FormularioRecordatorio   Ficha: qué, cuándo y "Detalles"
+    EditorRepeticion         Regla de repetición en versión compacta
+    HojaModal                Hoja deslizante reutilizable
+    HojaAjustes              Ajustes y diagnóstico de avisos
+    HojaPosponer             Posposición rápida
+    Bienvenida, Avisos, Icono
   utilidades/
-    constantes.js            Categorías, prioridades, plantillas, ajustes
+    constantes.js            Categorías, prioridades, atajos, ajustes
     fechas.js                Fechas y formato en español
     repeticion.js            Motor de repeticiones
     lenguaje.js              Interpretación de frases en lenguaje natural
     calendario.js            Generación de .ics, RRULE y enlaces de Google
-    modelo.js                Modelo del recordatorio, filtros y orden
+    modelo.js                Modelo, migraciones, tramos y búsqueda
     almacenamiento.js        Persistencia local
     sonido.js                Tonos sintetizados y vibración
     iconos.js                Registro de iconos de Font Awesome
   estilos/
-    global.css               Estilos y variables de tema
+    tokens.css               Único sitio con valores literales
+    global.css               Estilos de la aplicación
 ```
 
 Todo el código y los comentarios están en español. Los iconos son de Font

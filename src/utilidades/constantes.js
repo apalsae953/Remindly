@@ -1,9 +1,9 @@
 /**
- * Catálogos fijos de la aplicación: categorías, prioridades, tipos de
- * repetición, avisos previos y plantillas rápidas.
+ * Catálogos fijos de la aplicación.
  *
- * Todo lo que aquí se define es puramente descriptivo, sin lógica, para que
- * añadir una categoría nueva sea cuestión de una sola línea.
+ * Las categorías bajaron de dieciocho a ocho: con dieciocho nadie elegía, se
+ * quedaba todo en "Personal". Ocho caben de un vistazo y siguen cubriendo lo
+ * que la gente apunta de verdad.
  */
 
 /* ------------------------------------------------------------------ */
@@ -11,63 +11,112 @@
 /* ------------------------------------------------------------------ */
 
 export const CATEGORIAS = [
-  { id: 'personal', nombre: 'Personal', icono: 'house', color: '#6c5ce7' },
-  { id: 'trabajo', nombre: 'Trabajo', icono: 'briefcase', color: '#0984e3' },
-  { id: 'salud', nombre: 'Salud', icono: 'heart-pulse', color: '#e84393' },
-  { id: 'medicacion', nombre: 'Medicación', icono: 'pills', color: '#00b894' },
-  { id: 'compras', nombre: 'Compras', icono: 'cart-shopping', color: '#fdcb6e' },
-  { id: 'pagos', nombre: 'Pagos', icono: 'money-bill-wave', color: '#00cec9' },
-  { id: 'estudios', nombre: 'Estudios', icono: 'graduation-cap', color: '#a29bfe' },
-  { id: 'ejercicio', nombre: 'Ejercicio', icono: 'dumbbell', color: '#ff7675' },
-  { id: 'hogar', nombre: 'Hogar', icono: 'wrench', color: '#b2bec3' },
-  { id: 'familia', nombre: 'Familia', icono: 'users', color: '#fd79a8' },
-  { id: 'cumpleanos', nombre: 'Cumpleaños', icono: 'cake-candles', color: '#e17055' },
-  { id: 'mascotas', nombre: 'Mascotas', icono: 'paw', color: '#55efc4' },
-  { id: 'coche', nombre: 'Coche', icono: 'car', color: '#636e72' },
-  { id: 'viajes', nombre: 'Viajes', icono: 'plane', color: '#74b9ff' },
-  { id: 'ocio', nombre: 'Ocio', icono: 'film', color: '#ffeaa7' },
-  { id: 'plantas', nombre: 'Plantas', icono: 'seedling', color: '#26de81' },
-  { id: 'llamadas', nombre: 'Llamadas', icono: 'phone', color: '#4834d4' },
-  { id: 'otros', nombre: 'Otros', icono: 'tag', color: '#95a5a6' }
+  { id: 'personal', nombre: 'Personal', icono: 'user', color: 'var(--cat-personal)' },
+  { id: 'trabajo', nombre: 'Trabajo', icono: 'briefcase', color: 'var(--cat-trabajo)' },
+  { id: 'salud', nombre: 'Salud', icono: 'heart-pulse', color: 'var(--cat-salud)' },
+  { id: 'casa', nombre: 'Casa', icono: 'house', color: 'var(--cat-casa)' },
+  { id: 'dinero', nombre: 'Dinero', icono: 'wallet', color: 'var(--cat-dinero)' },
+  { id: 'gente', nombre: 'Gente', icono: 'users', color: 'var(--cat-gente)' },
+  { id: 'ocio', nombre: 'Ocio', icono: 'compass', color: 'var(--cat-ocio)' },
+  { id: 'otros', nombre: 'Otros', icono: 'tag', color: 'var(--cat-otros)' }
 ];
+
+/**
+ * Equivalencias de las categorías antiguas, para que los recordatorios
+ * guardados antes del rediseño sigan teniendo una categoría válida.
+ */
+export const CATEGORIAS_ANTIGUAS = {
+  medicacion: 'salud',
+  ejercicio: 'salud',
+  compras: 'casa',
+  hogar: 'casa',
+  plantas: 'casa',
+  mascotas: 'casa',
+  coche: 'casa',
+  pagos: 'dinero',
+  estudios: 'trabajo',
+  familia: 'gente',
+  cumpleanos: 'gente',
+  llamadas: 'gente',
+  viajes: 'ocio'
+};
 
 const MAPA_CATEGORIAS = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c]));
 
 export function obtenerCategoria(id) {
-  return MAPA_CATEGORIAS[id] || MAPA_CATEGORIAS.otros;
+  const directa = MAPA_CATEGORIAS[id];
+  if (directa) return directa;
+  const migrada = MAPA_CATEGORIAS[CATEGORIAS_ANTIGUAS[id]];
+  return migrada || MAPA_CATEGORIAS.otros;
 }
 
 /* ------------------------------------------------------------------ */
 /* Prioridades                                                         */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Tres niveles en lugar de cuatro. "Baja" y "Media" nunca se distinguían de
+ * verdad: lo único que importa es si algo es normal o si es importante.
+ */
 export const PRIORIDADES = [
-  { id: 'baja', nombre: 'Baja', color: '#74b9ff', peso: 0, icono: 'flag' },
-  { id: 'media', nombre: 'Media', color: '#fdcb6e', peso: 1, icono: 'flag' },
-  { id: 'alta', nombre: 'Alta', color: '#ff7675', peso: 2, icono: 'flag' },
-  { id: 'urgente', nombre: 'Urgente', color: '#d63031', peso: 3, icono: 'fire' }
+  { id: 'normal', nombre: 'Normal', peso: 0 },
+  { id: 'alta', nombre: 'Importante', peso: 1 },
+  { id: 'urgente', nombre: 'Urgente', peso: 2 }
 ];
+
+export const PRIORIDADES_ANTIGUAS = { baja: 'normal', media: 'normal' };
 
 const MAPA_PRIORIDADES = Object.fromEntries(PRIORIDADES.map((p) => [p.id, p]));
 
 export function obtenerPrioridad(id) {
-  return MAPA_PRIORIDADES[id] || MAPA_PRIORIDADES.media;
+  return MAPA_PRIORIDADES[id] || MAPA_PRIORIDADES[PRIORIDADES_ANTIGUAS[id]] || MAPA_PRIORIDADES.normal;
 }
 
 /* ------------------------------------------------------------------ */
 /* Repeticiones                                                        */
 /* ------------------------------------------------------------------ */
 
-export const TIPOS_REPETICION = [
-  { id: 'ninguna', nombre: 'No se repite', icono: 'calendar-day' },
-  { id: 'horas', nombre: 'Cada X horas', icono: 'stopwatch' },
-  { id: 'diaria', nombre: 'Cada día', icono: 'sun' },
-  { id: 'laborables', nombre: 'De lunes a viernes', icono: 'briefcase' },
-  { id: 'finsemana', nombre: 'Fines de semana', icono: 'bed' },
-  { id: 'semanal', nombre: 'Días concretos de la semana', icono: 'calendar-days' },
-  { id: 'mensual', nombre: 'Cada mes', icono: 'calendar' },
-  { id: 'anual', nombre: 'Cada año', icono: 'cake-candles' },
-  { id: 'personalizada', nombre: 'Personalizada', icono: 'sliders' }
+/**
+ * Frecuencias de repetición. Las seis caben de un vistazo y cada una lleva su
+ * propia explicación, porque "cada X días" o "varias veces al día" no se
+ * adivinan desde un chip suelto: hay que decirlo con palabras.
+ */
+export const FRECUENCIAS = [
+  { id: 'ninguna', nombre: 'Una sola vez', ayuda: 'No se repite' },
+  { id: 'diaria', nombre: 'Cada día', ayuda: 'También cada 2, 3 o N días' },
+  { id: 'semanal', nombre: 'Días de la semana', ayuda: 'Los que elijas, cada N semanas' },
+  { id: 'mensual', nombre: 'Cada mes', ayuda: 'Un día fijo del mes' },
+  { id: 'anual', nombre: 'Cada año', ayuda: 'Cumpleaños, revisiones' },
+  { id: 'horas', nombre: 'Cada pocas horas', ayuda: 'Por reloj, no por días' }
+];
+
+/** Nombre de la unidad de cada frecuencia, para el contador "Cada N ...". */
+export const UNIDAD_FRECUENCIA = {
+  diaria: { singular: 'día', plural: 'días', maximo: 365 },
+  semanal: { singular: 'semana', plural: 'semanas', maximo: 52 },
+  mensual: { singular: 'mes', plural: 'meses', maximo: 24 },
+  anual: { singular: 'año', plural: 'años', maximo: 10 },
+  horas: { singular: 'hora', plural: 'horas', maximo: 23 }
+};
+
+/**
+ * Repartos típicos de varias tomas al día. Son los que de verdad se usan
+ * (pastillas, riegos, estiramientos) y ahorran teclear cuatro horas a mano.
+ */
+export const REPARTOS_HORAS = [
+  { nombre: '1 vez', horas: ['09:00'] },
+  { nombre: '2 veces', horas: ['09:00', '21:00'] },
+  { nombre: '3 veces', horas: ['09:00', '15:00', '21:00'] },
+  { nombre: '4 veces', horas: ['08:00', '12:00', '16:00', '20:00'] },
+  { nombre: '6 veces', horas: ['08:00', '11:00', '14:00', '17:00', '20:00', '23:00'] }
+];
+
+/** Franjas habituales para la repetición por horas. */
+export const FRANJAS_HORARIAS = [
+  { nombre: 'Todo el día', franja: null },
+  { nombre: 'De día', franja: { desde: '08:00', hasta: '22:00' } },
+  { nombre: 'Horario laboral', franja: { desde: '09:00', hasta: '18:00' } },
+  { nombre: 'Solo de noche', franja: { desde: '22:00', hasta: '07:00' } }
 ];
 
 // La semana empieza en lunes, como es habitual en España.
@@ -81,151 +130,52 @@ export const DIAS_SEMANA = [
   { indice: 0, corto: 'D', nombre: 'Domingo' }
 ];
 
-export const UNIDADES_PERSONALIZADAS = [
-  { id: 'dias', nombre: 'días' },
-  { id: 'semanas', nombre: 'semanas' },
-  { id: 'meses', nombre: 'meses' },
-  { id: 'anos', nombre: 'años' }
-];
-
 /* ------------------------------------------------------------------ */
-/* Avisos previos y posposiciones                                      */
+/* Avisos                                                              */
 /* ------------------------------------------------------------------ */
 
 export const AVISOS_PREVIOS = [
-  { minutos: 0, nombre: 'A la hora exacta' },
-  { minutos: 5, nombre: '5 minutos antes' },
-  { minutos: 10, nombre: '10 minutos antes' },
-  { minutos: 15, nombre: '15 minutos antes' },
-  { minutos: 30, nombre: '30 minutos antes' },
-  { minutos: 60, nombre: '1 hora antes' },
-  { minutos: 120, nombre: '2 horas antes' },
-  { minutos: 1440, nombre: '1 día antes' },
-  { minutos: 2880, nombre: '2 días antes' },
-  { minutos: 10080, nombre: '1 semana antes' }
+  { minutos: 0, nombre: 'A la hora' },
+  { minutos: 10, nombre: '10 min antes' },
+  { minutos: 30, nombre: '30 min antes' },
+  { minutos: 60, nombre: '1 h antes' },
+  { minutos: 1440, nombre: 'El día antes' },
+  { minutos: 10080, nombre: 'La semana antes' }
 ];
 
 export const OPCIONES_POSPONER = [
-  { minutos: 5, nombre: '5 min', icono: 'clock' },
-  { minutos: 10, nombre: '10 min', icono: 'clock' },
-  { minutos: 30, nombre: '30 min', icono: 'clock' },
-  { minutos: 60, nombre: '1 hora', icono: 'hourglass-half' },
-  { minutos: 180, nombre: '3 horas', icono: 'hourglass-half' },
-  { minutos: 1440, nombre: 'Mañana', icono: 'calendar-day' }
+  { minutos: 10, nombre: '10 min' },
+  { minutos: 30, nombre: '30 min' },
+  { minutos: 60, nombre: '1 hora' },
+  { minutos: 180, nombre: '3 horas' },
+  { minutos: 1440, nombre: 'Mañana' }
 ];
 
 /* ------------------------------------------------------------------ */
-/* Plantillas rápidas                                                  */
+/* Compositor                                                          */
 /* ------------------------------------------------------------------ */
 
 /**
- * Atajos para crear recordatorios habituales con un solo toque. Cada plantilla
- * rellena el formulario, pero el usuario siempre puede ajustar lo que quiera.
+ * Frases de ejemplo que aparecen cuando el compositor está vacío y enfocado.
+ * Enseñan la sintaxis sin tener que explicarla en ningún sitio.
  */
-export const PLANTILLAS = [
-  {
-    id: 'medicacion',
-    nombre: 'Tomar pastilla',
-    icono: 'pills',
-    categoria: 'medicacion',
-    prioridad: 'alta',
-    repeticion: { tipo: 'diaria', intervalo: 1 },
-    persistente: true
-  },
-  {
-    id: 'agua',
-    nombre: 'Beber agua',
-    icono: 'droplet',
-    categoria: 'salud',
-    prioridad: 'baja',
-    repeticion: { tipo: 'horas', intervalo: 2 }
-  },
-  {
-    id: 'reunion',
-    nombre: 'Reunión',
-    icono: 'users',
-    categoria: 'trabajo',
-    prioridad: 'alta',
-    avisosPrevios: [0, 15]
-  },
-  {
-    id: 'basura',
-    nombre: 'Sacar la basura',
-    icono: 'inbox',
-    categoria: 'hogar',
-    prioridad: 'media',
-    repeticion: { tipo: 'diaria', intervalo: 1 }
-  },
-  {
-    id: 'recibo',
-    nombre: 'Pagar recibo',
-    icono: 'money-bill-wave',
-    categoria: 'pagos',
-    prioridad: 'alta',
-    repeticion: { tipo: 'mensual', intervalo: 1 },
-    avisosPrevios: [0, 1440]
-  },
-  {
-    id: 'gimnasio',
-    nombre: 'Ir al gimnasio',
-    icono: 'dumbbell',
-    categoria: 'ejercicio',
-    prioridad: 'media',
-    repeticion: { tipo: 'semanal', intervalo: 1, diasSemana: [1, 3, 5] }
-  },
-  {
-    id: 'cumple',
-    nombre: 'Cumpleaños',
-    icono: 'cake-candles',
-    categoria: 'cumpleanos',
-    prioridad: 'media',
-    todoElDia: true,
-    repeticion: { tipo: 'anual', intervalo: 1 },
-    avisosPrevios: [0, 1440]
-  },
-  {
-    id: 'plantas',
-    nombre: 'Regar las plantas',
-    icono: 'seedling',
-    categoria: 'plantas',
-    prioridad: 'baja',
-    repeticion: { tipo: 'personalizada', intervalo: 3, unidad: 'dias' }
-  },
-  {
-    id: 'llamada',
-    nombre: 'Llamar a alguien',
-    icono: 'phone',
-    categoria: 'llamadas',
-    prioridad: 'media'
-  },
-  {
-    id: 'coche',
-    nombre: 'Revisión del coche',
-    icono: 'car',
-    categoria: 'coche',
-    prioridad: 'media',
-    repeticion: { tipo: 'personalizada', intervalo: 6, unidad: 'meses' },
-    avisosPrevios: [0, 10080]
-  }
+export const EJEMPLOS_COMPOSITOR = [
+  'Llamar a Ana mañana a las 9',
+  'Pagar el alquiler cada mes',
+  'Gimnasio cada martes a las 19',
+  'Sacar la basura todos los días a las 21:30',
+  'Revisión del coche el 15 de marzo',
+  'Beber agua cada 2 horas'
 ];
 
 /* ------------------------------------------------------------------ */
-/* Vistas y ordenaciones                                               */
+/* Tramos de la lista                                                  */
 /* ------------------------------------------------------------------ */
 
-export const VISTAS = [
-  { id: 'hoy', nombre: 'Hoy', icono: 'bolt' },
-  { id: 'agenda', nombre: 'Agenda', icono: 'list-check' },
-  { id: 'calendario', nombre: 'Calendario', icono: 'calendar-days' },
-  { id: 'resumen', nombre: 'Resumen', icono: 'chart-simple' },
-  { id: 'ajustes', nombre: 'Ajustes', icono: 'gear' }
-];
-
-export const ORDENACIONES = [
-  { id: 'fecha', nombre: 'Por fecha', icono: 'clock' },
-  { id: 'prioridad', nombre: 'Por prioridad', icono: 'flag' },
-  { id: 'categoria', nombre: 'Por categoría', icono: 'layer-group' },
-  { id: 'alfabetico', nombre: 'Alfabético', icono: 'bars' }
+export const TRAMOS = [
+  { id: 'hoy', nombre: 'Hoy' },
+  { id: 'proximos', nombre: 'Próximos' },
+  { id: 'hechos', nombre: 'Hechos' }
 ];
 
 /* ------------------------------------------------------------------ */
@@ -234,7 +184,6 @@ export const ORDENACIONES = [
 
 export const AJUSTES_POR_DEFECTO = {
   tema: 'auto', // 'auto' | 'claro' | 'oscuro'
-  colorPrincipal: '#6c5ce7',
   sonido: true,
   vibracion: true,
   minutosPosponerRapido: 10,
@@ -243,9 +192,6 @@ export const AJUSTES_POR_DEFECTO = {
   noMolestar: false,
   noMolestarDesde: '23:00',
   noMolestarHasta: '07:30',
-  ordenacion: 'fecha',
-  mostrarCompletados: false,
-  agruparPorDia: true,
   primeraVez: true
 };
 

@@ -1,33 +1,47 @@
 /**
- * Formulario de creación y edición de recordatorios.
+ * Ficha de un recordatorio.
  *
- * Trabaja sobre un borrador local y solo avisa al exterior al guardar, para
- * que cancelar no deje cambios a medias. Al escribir el título de un
- * recordatorio nuevo se intenta reconocer fecha, hora y repetición del propio
- * texto y se ofrece aplicarlo con un toque.
+ * Solo dos bloques a la vista: qué y cuándo. Todo lo demás (categoría,
+ * prioridad, notas, subtareas, etiquetas, enlaces y opciones de aviso) está
+ * detrás de "Detalles", porque la inmensa mayoría de las veces no hace falta.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icono from './Icono.jsx';
 import HojaModal from './HojaModal.jsx';
 import EditorRepeticion from './EditorRepeticion.jsx';
-import {
-  AVISOS_PREVIOS,
-  CATEGORIAS,
-  PRIORIDADES,
-  obtenerCategoria
-} from '../utilidades/constantes.js';
+import { AVISOS_PREVIOS, CATEGORIAS, PRIORIDADES } from '../utilidades/constantes.js';
 import { crearRecordatorio } from '../utilidades/modelo.js';
+import { normalizarRepeticion } from '../utilidades/repeticion.js';
 import { generarId } from '../utilidades/almacenamiento.js';
 import { aFechaISO, formatearFechaLarga, sumarDias } from '../utilidades/fechas.js';
-import { interpretarTexto } from '../utilidades/lenguaje.js';
 import { compartirRecordatorio, enlaceGoogleCalendar } from '../utilidades/calendario.js';
-import { sonarClic, vibrar } from '../utilidades/sonido.js';
+import { vibrar } from '../utilidades/sonido.js';
+
+/** Convierte lo entendido de una frase en campos del formulario. */
+function desdeLectura(lectura, ajustes) {
+  if (!lectura) return {};
+  return {
+    titulo: lectura.titulo || '',
+    fecha: lectura.fecha || aFechaISO(new Date()),
+    hora: lectura.hora || ajustes.horaPorDefecto || '09:00',
+    categoria: lectura.categoria || 'personal',
+    prioridad: lectura.prioridad || 'normal',
+    etiquetas: lectura.etiquetas || [],
+    repeticion: lectura.repeticion
+      ? { ...crearRecordatorio().repeticion, ...lectura.repeticion }
+      : undefined
+  };
+}
+
+function limpiarIndefinidos(objeto) {
+  return Object.fromEntries(Object.entries(objeto).filter(([, valor]) => valor !== undefined));
+}
 
 export function FormularioRecordatorio({
   abierto,
   recordatorio,
-  plantilla,
+  lecturaInicial,
   ajustes,
   alGuardar,
   alEliminar,
@@ -36,97 +50,66 @@ export function FormularioRecordatorio({
 }) {
   const esNuevo = !recordatorio?.id;
   const [borrador, setBorrador] = useState(() => crearRecordatorio({}, ajustes));
+  const [detalles, setDetalles] = useState(false);
   const [textoEtiqueta, setTextoEtiqueta] = useState('');
   const [textoSubtarea, setTextoSubtarea] = useState('');
-  const [sugerencia, setSugerencia] = useState(null);
-  const [avanzado, setAvanzado] = useState(false);
   const campoTitulo = useRef(null);
 
-  // Cada vez que se abre la hoja se reinicia el borrador con lo que toque.
+  // Al abrir, el borrador se reinicia con lo que toque.
   useEffect(() => {
     if (!abierto) return;
 
     if (recordatorio?.id) {
       setBorrador({ ...recordatorio });
-      setAvanzado(
-        Boolean(recordatorio.enlace || recordatorio.ubicacion || recordatorio.persistente)
-      );
-    } else {
-      const desdePlantilla = plantilla
-        ? {
-            titulo: plantilla.nombre,
-            categoria: plantilla.categoria,
-            prioridad: plantilla.prioridad,
-            todoElDia: Boolean(plantilla.todoElDia),
-            persistente: Boolean(plantilla.persistente),
-            repeticion: plantilla.repeticion
-              ? { ...crearRecordatorio().repeticion, ...plantilla.repeticion }
-              : undefined,
-            avisosPrevios: plantilla.avisosPrevios
-          }
-        : {};
-
-      setBorrador(
-        crearRecordatorio(
-          { ...limpiarIndefinidos(desdePlantilla), ...limpiarIndefinidos(recordatorio || {}) },
-          ajustes
+      setDetalles(
+        Boolean(
+          recordatorio.notas ||
+            recordatorio.subtareas?.length ||
+            recordatorio.etiquetas?.length ||
+            recordatorio.enlace ||
+            recordatorio.ubicacion
         )
       );
-      setAvanzado(false);
+    } else {
+      setBorrador(crearRecordatorio(limpiarIndefinidos(desdeLectura(lecturaInicial, ajustes)), ajustes));
+      setDetalles(false);
     }
 
-    setSugerencia(null);
     setTextoEtiqueta('');
     setTextoSubtarea('');
-  }, [abierto, recordatorio, plantilla, ajustes]);
+  }, [abierto, recordatorio, lecturaInicial, ajustes]);
 
-  // El foco automático en el móvil abre el teclado y tapa la hoja, así que
-  // solo se hace en pantallas amplias.
+  // En el móvil el teclado taparía la hoja, así que solo se enfoca en pantallas anchas.
   useEffect(() => {
-    if (abierto && esNuevo && window.innerWidth >= 760) {
-      const identificador = setTimeout(() => campoTitulo.current?.focus(), 260);
-      return () => clearTimeout(identificador);
+    if (abierto && esNuevo && window.innerWidth >= 720) {
+      const id = setTimeout(() => campoTitulo.current?.focus(), 280);
+      return () => clearTimeout(id);
     }
     return undefined;
   }, [abierto, esNuevo]);
 
-  const categoria = obtenerCategoria(borrador.categoria);
   const valido = borrador.titulo.trim().length > 0;
-
+  // Con varias horas al día la primera la marca esa lista, no este campo:
+  // si se pudieran editar los dos, acabarían contradiciéndose.
+  const horasMultiples = normalizarRepeticion(borrador.repeticion).horas.length > 1;
   const cambiar = (cambios) => setBorrador((previo) => ({ ...previo, ...cambios }));
 
-  /* ---------------- Reconocimiento del texto ---------------- */
+  const atajosFecha = [
+    { nombre: 'Hoy', fecha: aFechaISO(new Date()) },
+    { nombre: 'Mañana', fecha: aFechaISO(sumarDias(new Date(), 1)) },
+    { nombre: 'En 3 días', fecha: aFechaISO(sumarDias(new Date(), 3)) },
+    { nombre: 'En una semana', fecha: aFechaISO(sumarDias(new Date(), 7)) }
+  ];
 
-  const alEscribirTitulo = (texto) => {
-    cambiar({ titulo: texto });
-    if (!esNuevo || texto.trim().length < 5) {
-      setSugerencia(null);
-      return;
-    }
-
-    const interpretado = interpretarTexto(texto);
-    if (interpretado?.detectado?.length) setSugerencia(interpretado);
-    else setSugerencia(null);
-  };
-
-  const aplicarSugerencia = () => {
-    if (!sugerencia) return;
-    cambiar({
-      titulo: sugerencia.titulo,
-      fecha: sugerencia.fecha || borrador.fecha,
-      hora: sugerencia.hora || borrador.hora,
-      categoria: sugerencia.categoria || borrador.categoria,
-      prioridad: sugerencia.prioridad || borrador.prioridad,
-      etiquetas: sugerencia.etiquetas.length ? sugerencia.etiquetas : borrador.etiquetas,
-      repeticion: sugerencia.repeticion
-        ? { ...borrador.repeticion, ...sugerencia.repeticion }
-        : borrador.repeticion
+  const alternarAvisoPrevio = (minutos) => {
+    setBorrador((previo) => {
+      const actuales = previo.avisosPrevios || [];
+      const nuevos = actuales.includes(minutos)
+        ? actuales.filter((m) => m !== minutos)
+        : [...actuales, minutos].sort((a, b) => a - b);
+      return { ...previo, avisosPrevios: nuevos.length ? nuevos : [0] };
     });
-    setSugerencia(null);
-    sonarClic();
   };
-
-  /* ---------------- Subtareas y etiquetas ---------------- */
 
   const anadirSubtarea = () => {
     const texto = textoSubtarea.trim();
@@ -135,10 +118,6 @@ export function FormularioRecordatorio({
       subtareas: [...borrador.subtareas, { id: generarId('sub'), texto, hecha: false }]
     });
     setTextoSubtarea('');
-  };
-
-  const quitarSubtarea = (id) => {
-    cambiar({ subtareas: borrador.subtareas.filter((s) => s.id !== id) });
   };
 
   const anadirEtiqueta = () => {
@@ -151,34 +130,9 @@ export function FormularioRecordatorio({
     setTextoEtiqueta('');
   };
 
-  // Se parte siempre del estado real para que varias pulsaciones seguidas
-  // sobre las pastillas de aviso no se pisen entre ellas.
-  const alternarAvisoPrevio = (minutos) => {
-    setBorrador((previo) => {
-      const actuales = previo.avisosPrevios || [];
-      const nuevos = actuales.includes(minutos)
-        ? actuales.filter((m) => m !== minutos)
-        : [...actuales, minutos].sort((a, b) => a - b);
-      return { ...previo, avisosPrevios: nuevos.length ? nuevos : [0] };
-    });
-  };
-
-  /* ---------------- Atajos de fecha ---------------- */
-
-  const atajosFecha = useMemo(
-    () => [
-      { nombre: 'Hoy', fecha: aFechaISO(new Date()) },
-      { nombre: 'Mañana', fecha: aFechaISO(sumarDias(new Date(), 1)) },
-      { nombre: 'En 3 días', fecha: aFechaISO(sumarDias(new Date(), 3)) },
-      { nombre: 'En una semana', fecha: aFechaISO(sumarDias(new Date(), 7)) },
-      { nombre: 'En un mes', fecha: aFechaISO(sumarDias(new Date(), 30)) }
-    ],
-    []
-  );
-
   const guardar = () => {
     if (!valido) return;
-    vibrar([30]);
+    vibrar([25]);
     alGuardar({ ...borrador, titulo: borrador.titulo.trim() });
   };
 
@@ -187,68 +141,43 @@ export function FormularioRecordatorio({
   return (
     <HojaModal
       abierta={abierto}
-      titulo={esNuevo ? 'Nuevo recordatorio' : 'Editar recordatorio'}
-      icono={esNuevo ? 'calendar-plus' : 'pen'}
+      titulo={esNuevo ? 'Nuevo recordatorio' : 'Editar'}
       alCerrar={alCerrar}
       pie={
         <>
-          <button type="button" className="boton secundario" onClick={alCerrar}>
+          <button type="button" className="boton contorno" onClick={alCerrar}>
             Cancelar
           </button>
-          <button type="button" className="boton principal" onClick={guardar} disabled={!valido}>
-            <Icono nombre="check" />
-            {esNuevo ? 'Crear recordatorio' : 'Guardar cambios'}
+          <button type="button" className="boton solido" onClick={guardar} disabled={!valido}>
+            {esNuevo ? 'Añadir' : 'Guardar'}
           </button>
         </>
       }
     >
-      {/* Título */}
+      {/* Qué */}
       <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="pen" />
-          ¿Qué quieres recordar?
-        </div>
         <input
           ref={campoTitulo}
           type="text"
-          className="entrada grande"
-          placeholder="Ej: Llamar a Ana mañana a las 9"
+          className="entrada-titular"
+          placeholder="¿Qué quieres recordar?"
           value={borrador.titulo}
-          onChange={(e) => alEscribirTitulo(e.target.value)}
           maxLength={140}
+          onChange={(e) => cambiar({ titulo: e.target.value })}
         />
-
-        {sugerencia ? (
-          <button
-            type="button"
-            className="aviso-caja info"
-            style={{ marginTop: 10, width: '100%', textAlign: 'left' }}
-            onClick={aplicarSugerencia}
-          >
-            <span className="icono-caja">
-              <Icono nombre="wand-magic-sparkles" />
-            </span>
-            <span>
-              <strong>He entendido: {sugerencia.detectado.join(', ')}</strong>
-              Toca para aplicarlo y dejar el título como “{sugerencia.titulo}”.
-            </span>
-          </button>
-        ) : null}
       </div>
 
-      {/* Fecha y hora */}
+      {/* Cuándo */}
       <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="calendar-day" />
-          Cuándo
-        </div>
+        <span className="campo-rotulo">Cuándo</span>
 
-        <div className="tiras-filtro" style={{ margin: '0 0 10px', padding: 0 }}>
+        <div className="chips deslizable">
           {atajosFecha.map((atajo) => (
             <button
               key={atajo.nombre}
               type="button"
-              className={`pastilla ${borrador.fecha === atajo.fecha ? 'activa' : ''}`}
+              className="chip"
+              aria-pressed={borrador.fecha === atajo.fecha}
               onClick={() => cambiar({ fecha: atajo.fecha })}
             >
               {atajo.nombre}
@@ -256,396 +185,327 @@ export function FormularioRecordatorio({
           ))}
         </div>
 
-        <div className="fila-campos">
+        <div className="fila-campos" style={{ marginTop: 'var(--space-3)' }}>
           <input
             type="date"
             className="entrada"
             value={borrador.fecha}
+            aria-label="Fecha"
             onChange={(e) => cambiar({ fecha: e.target.value })}
           />
           <input
             type="time"
             className="entrada"
             value={borrador.hora}
-            disabled={borrador.todoElDia}
+            disabled={borrador.todoElDia || horasMultiples}
+            aria-label="Hora"
             onChange={(e) => cambiar({ hora: e.target.value })}
           />
         </div>
 
-        <p className="texto-ayuda">
-          <Icono nombre="circle-info" /> {formatearFechaLarga(borrador.fecha || new Date())}
+        <p className="campo-nota">
+          {formatearFechaLarga(borrador.fecha || new Date())}
           {borrador.todoElDia ? ' · todo el día' : ` · a las ${borrador.hora}`}
+          {horasMultiples ? ' · la marcan las horas de abajo' : ''}
         </p>
 
-        <div className="interruptor-fila">
-          <div className="interruptor-texto">
-            <div className="titulo">
-              <Icono nombre="sun" />
-              Todo el día
-            </div>
-            <div className="ayuda">Sin hora concreta; el aviso llegará por la mañana.</div>
+        <div className="opcion">
+          <div className="opcion-texto">
+            <p className="opcion-titulo">Todo el día</p>
+            <p className="opcion-ayuda">Sin hora concreta; el aviso llega por la mañana.</p>
           </div>
           <button
             type="button"
-            className={`interruptor ${borrador.todoElDia ? 'activo' : ''}`}
-            onClick={() => cambiar({ todoElDia: !borrador.todoElDia })}
+            className="interruptor"
             aria-pressed={borrador.todoElDia}
             aria-label="Todo el día"
+            onClick={() => cambiar({ todoElDia: !borrador.todoElDia })}
           />
         </div>
-      </div>
 
-      {/* Categoría */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="layer-group" />
-          Categoría
-        </div>
-        <div className="rejilla-opciones">
-          {CATEGORIAS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`opcion-cuadro ${borrador.categoria === item.id ? 'activa' : ''}`}
-              style={{ '--color-opcion': item.color }}
-              onClick={() => cambiar({ categoria: item.id })}
-            >
-              <Icono nombre={item.icono} />
-              <span>{item.nombre}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Prioridad */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="flag" />
-          Prioridad
-        </div>
-        <div className="rejilla-opciones" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-          {PRIORIDADES.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`opcion-cuadro ${borrador.prioridad === item.id ? 'activa' : ''}`}
-              style={{ '--color-opcion': item.color }}
-              onClick={() => cambiar({ prioridad: item.id })}
-            >
-              <Icono nombre={item.icono} />
-              <span>{item.nombre}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Repetición */}
-      <EditorRepeticion
-        valor={borrador.repeticion}
-        alCambiar={(actualizar) =>
-          setBorrador((previo) => ({
-            ...previo,
-            repeticion:
-              typeof actualizar === 'function' ? actualizar(previo.repeticion) : actualizar
-          }))
-        }
-      />
-
-      {/* Avisos previos */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="bell" />
-          Avisarme
-        </div>
-        <div className="tiras-filtro" style={{ margin: 0, padding: 0, flexWrap: 'wrap' }}>
-          {AVISOS_PREVIOS.map((aviso) => (
-            <button
-              key={aviso.minutos}
-              type="button"
-              className={`pastilla ${
-                borrador.avisosPrevios?.includes(aviso.minutos) ? 'activa' : ''
-              }`}
-              onClick={() => alternarAvisoPrevio(aviso.minutos)}
-            >
-              {aviso.nombre}
-            </button>
-          ))}
-        </div>
-        <p className="texto-ayuda">
-          Puedes elegir varios: recibirás una notificación por cada uno.
-        </p>
-      </div>
-
-      {/* Notas */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="note-sticky" />
-          Notas
-        </div>
-        <textarea
-          className="area-texto"
-          placeholder="Detalles, teléfono, dirección..."
-          value={borrador.notas}
-          onChange={(e) => cambiar({ notas: e.target.value })}
-          maxLength={600}
-        />
-      </div>
-
-      {/* Subtareas */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="list-check" />
-          Subtareas
-        </div>
-
-        {borrador.subtareas.length ? (
-          <div className="subtareas" style={{ borderTop: 'none', paddingTop: 0, marginBottom: 10 }}>
-            {borrador.subtareas.map((subtarea) => (
-              <div key={subtarea.id} className="subtarea" style={{ justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <Icono nombre="square-check" style={{ color: 'var(--texto-suave)' }} />
-                  {subtarea.texto}
-                </span>
-                <button
-                  type="button"
-                  className="accion-mini peligro"
-                  onClick={() => quitarSubtarea(subtarea.id)}
-                  aria-label="Quitar subtarea"
-                >
-                  <Icono nombre="xmark" />
-                </button>
-              </div>
-            ))}
-          </div>
-        ) : null}
-
-        <div className="fila-campos">
-          <input
-            type="text"
-            className="entrada"
-            placeholder="Añadir un paso"
-            value={textoSubtarea}
-            onChange={(e) => setTextoSubtarea(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                anadirSubtarea();
-              }
-            }}
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          <EditorRepeticion
+            valor={borrador.repeticion}
+            fechaBase={borrador.fecha}
+            horaBase={borrador.hora}
+            todoElDia={borrador.todoElDia}
+            alCambiarHora={(hora) => cambiar({ hora })}
+            alCambiar={(actualizar) =>
+              setBorrador((previo) => ({
+                ...previo,
+                repeticion:
+                  typeof actualizar === 'function' ? actualizar(previo.repeticion) : actualizar
+              }))
+            }
           />
-          <button
-            type="button"
-            className="boton secundario"
-            style={{ flex: '0 0 auto' }}
-            onClick={anadirSubtarea}
-          >
-            <Icono nombre="plus" />
-          </button>
-        </div>
-      </div>
-
-      {/* Etiquetas */}
-      <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="tag" />
-          Etiquetas
         </div>
 
-        {borrador.etiquetas.length ? (
-          <div className="etiquetas-lista" style={{ marginBottom: 10 }}>
-            {borrador.etiquetas.map((etiqueta) => (
+        <div style={{ marginTop: 'var(--space-5)' }}>
+          <span className="campo-rotulo">Avisarme</span>
+          <div className="chips">
+            {AVISOS_PREVIOS.map((aviso) => (
               <button
-                key={etiqueta}
+                key={aviso.minutos}
                 type="button"
-                className="etiqueta-chip"
-                onClick={() =>
-                  cambiar({ etiquetas: borrador.etiquetas.filter((e) => e !== etiqueta) })
-                }
+                className="chip"
+                aria-pressed={borrador.avisosPrevios?.includes(aviso.minutos)}
+                onClick={() => alternarAvisoPrevio(aviso.minutos)}
               >
-                #{etiqueta} <Icono nombre="xmark" />
+                {aviso.nombre}
               </button>
             ))}
           </div>
-        ) : null}
-
-        <div className="fila-campos">
-          <input
-            type="text"
-            className="entrada"
-            placeholder="Ej: casa, urgente, verano"
-            value={textoEtiqueta}
-            onChange={(e) => setTextoEtiqueta(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ',') {
-                e.preventDefault();
-                anadirEtiqueta();
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="boton secundario"
-            style={{ flex: '0 0 auto' }}
-            onClick={anadirEtiqueta}
-          >
-            <Icono nombre="plus" />
-          </button>
         </div>
       </div>
 
-      {/* Opciones avanzadas */}
-      <button
-        type="button"
-        className="boton secundario ancho"
-        onClick={() => setAvanzado((v) => !v)}
-      >
-        <Icono nombre={avanzado ? 'chevron-up' : 'chevron-down'} />
-        {avanzado ? 'Ocultar opciones avanzadas' : 'Más opciones'}
-      </button>
+      {/* Detalles */}
+      <div className="plegable">
+        <button
+          type="button"
+          className="plegable-cabecera"
+          aria-expanded={detalles}
+          onClick={() => setDetalles((v) => !v)}
+        >
+          Detalles
+          <Icono nombre="chevron-down" />
+        </button>
 
-      {avanzado ? (
-        <div className="seccion" style={{ marginTop: 16 }}>
-          <div className="campo">
-            <div className="campo-etiqueta">
-              <Icono nombre="link" />
-              Enlace
+        {detalles ? (
+          <div style={{ paddingBottom: 'var(--space-5)' }}>
+            <span className="campo-rotulo">Categoría</span>
+            <div className="chips">
+              {CATEGORIAS.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={borrador.categoria === item.id}
+                  onClick={() => cambiar({ categoria: item.id })}
+                >
+                  <i className="punto-categoria" style={{ '--color-categoria': item.color }} />
+                  {item.nombre}
+                </button>
+              ))}
             </div>
-            <input
-              type="url"
-              className="entrada"
-              placeholder="https://..."
-              value={borrador.enlace}
-              onChange={(e) => cambiar({ enlace: e.target.value })}
+
+            <span className="campo-rotulo" style={{ marginTop: 'var(--space-5)' }}>
+              Prioridad
+            </span>
+            <div className="chips">
+              {PRIORIDADES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="chip"
+                  aria-pressed={borrador.prioridad === item.id}
+                  onClick={() => cambiar({ prioridad: item.id })}
+                >
+                  {item.nombre}
+                </button>
+              ))}
+            </div>
+
+            <span className="campo-rotulo" style={{ marginTop: 'var(--space-5)' }}>
+              Notas
+            </span>
+            <textarea
+              className="area"
+              placeholder="Detalles, teléfono, dirección…"
+              value={borrador.notas}
+              maxLength={600}
+              onChange={(e) => cambiar({ notas: e.target.value })}
             />
-          </div>
 
-          <div className="campo">
-            <div className="campo-etiqueta">
-              <Icono nombre="location-dot" />
-              Lugar
-            </div>
-            <input
-              type="text"
-              className="entrada"
-              placeholder="Dónde tiene que pasar"
-              value={borrador.ubicacion}
-              onChange={(e) => cambiar({ ubicacion: e.target.value })}
-            />
-          </div>
-
-          <div className="lista-ajustes">
-            <div className="interruptor-fila">
-              <div className="interruptor-texto">
-                <div className="titulo">
-                  <Icono nombre="thumbtack" />
-                  Destacado
-                </div>
-                <div className="ayuda">Aparece siempre arriba del todo.</div>
+            <span className="campo-rotulo" style={{ marginTop: 'var(--space-5)' }}>
+              Subtareas
+            </span>
+            {borrador.subtareas.length ? (
+              <div className="apilado" style={{ marginBottom: 'var(--space-3)' }}>
+                {borrador.subtareas.map((subtarea) => (
+                  <div className="opcion" key={subtarea.id} style={{ padding: 'var(--space-2) 0' }}>
+                    <span className="opcion-texto opcion-titulo">{subtarea.texto}</span>
+                    <button
+                      type="button"
+                      className="icono-boton"
+                      aria-label={`Quitar ${subtarea.texto}`}
+                      onClick={() =>
+                        cambiar({ subtareas: borrador.subtareas.filter((s) => s.id !== subtarea.id) })
+                      }
+                    >
+                      <Icono nombre="xmark" />
+                    </button>
+                  </div>
+                ))}
               </div>
-              <button
-                type="button"
-                className={`interruptor ${borrador.fijado ? 'activo' : ''}`}
-                onClick={() => cambiar({ fijado: !borrador.fijado })}
-                aria-label="Destacado"
-              />
-            </div>
-
-            <div className="interruptor-fila">
-              <div className="interruptor-texto">
-                <div className="titulo">
-                  <Icono nombre="circle-exclamation" />
-                  Aviso insistente
-                </div>
-                <div className="ayuda">
-                  La notificación se queda en pantalla hasta que la atiendes.
-                </div>
-              </div>
-              <button
-                type="button"
-                className={`interruptor ${borrador.persistente ? 'activo' : ''}`}
-                onClick={() => cambiar({ persistente: !borrador.persistente })}
-                aria-label="Aviso insistente"
-              />
-            </div>
-
-            <div className="interruptor-fila">
-              <div className="interruptor-texto">
-                <div className="titulo">
-                  <Icono nombre="volume-xmark" />
-                  Aviso silencioso
-                </div>
-                <div className="ayuda">Llega la notificación pero sin sonido ni vibración.</div>
-              </div>
-              <button
-                type="button"
-                className={`interruptor ${borrador.silencioso ? 'activo' : ''}`}
-                onClick={() => cambiar({ silencioso: !borrador.silencioso })}
-                aria-label="Aviso silencioso"
-              />
-            </div>
-          </div>
-
-          <div className="separador" />
-
-          <div className="fila-campos" style={{ flexWrap: 'wrap', gap: 8 }}>
-            {enlaceGoogle ? (
-              <a
-                className="boton secundario"
-                href={enlaceGoogle}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: 'none' }}
-              >
-                <Icono nombre="calendar-plus" />
-                Añadir a Google Calendar
-              </a>
             ) : null}
+            <div className="fila-campos">
+              <input
+                type="text"
+                className="entrada"
+                placeholder="Añadir un paso"
+                value={textoSubtarea}
+                onChange={(e) => setTextoSubtarea(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    anadirSubtarea();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="boton contorno"
+                style={{ flex: '0 0 auto' }}
+                onClick={anadirSubtarea}
+                aria-label="Añadir subtarea"
+              >
+                <Icono nombre="plus" />
+              </button>
+            </div>
 
-            <button
-              type="button"
-              className="boton secundario"
-              onClick={() =>
-                compartirRecordatorio(borrador, formatearFechaLarga(borrador.fecha || new Date()))
-              }
-            >
-              <Icono nombre="share-nodes" />
-              Compartir
-            </button>
+            <span className="campo-rotulo" style={{ marginTop: 'var(--space-5)' }}>
+              Etiquetas
+            </span>
+            {borrador.etiquetas.length ? (
+              <div className="chips" style={{ marginBottom: 'var(--space-3)' }}>
+                {borrador.etiquetas.map((etiqueta) => (
+                  <button
+                    key={etiqueta}
+                    type="button"
+                    className="chip"
+                    onClick={() =>
+                      cambiar({ etiquetas: borrador.etiquetas.filter((e) => e !== etiqueta) })
+                    }
+                  >
+                    #{etiqueta} <Icono nombre="xmark" />
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="fila-campos">
+              <input
+                type="text"
+                className="entrada"
+                placeholder="casa, verano…"
+                value={textoEtiqueta}
+                onChange={(e) => setTextoEtiqueta(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    anadirEtiqueta();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="boton contorno"
+                style={{ flex: '0 0 auto' }}
+                onClick={anadirEtiqueta}
+                aria-label="Añadir etiqueta"
+              >
+                <Icono nombre="plus" />
+              </button>
+            </div>
+
+            <span className="campo-rotulo" style={{ marginTop: 'var(--space-5)' }}>
+              Enlace y lugar
+            </span>
+            <div className="apilado">
+              <input
+                type="url"
+                className="entrada"
+                placeholder="https://…"
+                value={borrador.enlace}
+                aria-label="Enlace"
+                onChange={(e) => cambiar({ enlace: e.target.value })}
+              />
+              <input
+                type="text"
+                className="entrada"
+                placeholder="Dónde"
+                value={borrador.ubicacion}
+                aria-label="Lugar"
+                onChange={(e) => cambiar({ ubicacion: e.target.value })}
+              />
+            </div>
+
+            <div style={{ marginTop: 'var(--space-5)' }}>
+              <div className="opcion">
+                <div className="opcion-texto">
+                  <p className="opcion-titulo">Aviso insistente</p>
+                  <p className="opcion-ayuda">Se queda en pantalla hasta que lo atiendes.</p>
+                </div>
+                <button
+                  type="button"
+                  className="interruptor"
+                  aria-pressed={borrador.persistente}
+                  aria-label="Aviso insistente"
+                  onClick={() => cambiar({ persistente: !borrador.persistente })}
+                />
+              </div>
+
+              <div className="opcion">
+                <div className="opcion-texto">
+                  <p className="opcion-titulo">Aviso silencioso</p>
+                  <p className="opcion-ayuda">Llega la notificación, sin sonido ni vibración.</p>
+                </div>
+                <button
+                  type="button"
+                  className="interruptor"
+                  aria-pressed={borrador.silencioso}
+                  aria-label="Aviso silencioso"
+                  onClick={() => cambiar({ silencioso: !borrador.silencioso })}
+                />
+              </div>
+            </div>
+
+            <div className="separador" />
+
+            <div className="en-linea">
+              {enlaceGoogle ? (
+                <a
+                  className="enlace-accion"
+                  href={enlaceGoogle}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Añadir a Google Calendar
+                </a>
+              ) : null}
+
+              <button
+                type="button"
+                className="enlace-accion"
+                onClick={() =>
+                  compartirRecordatorio(borrador, formatearFechaLarga(borrador.fecha || new Date()))
+                }
+              >
+                Compartir
+              </button>
+
+              {!esNuevo ? (
+                <button type="button" className="enlace-accion" onClick={() => alDuplicar?.(borrador)}>
+                  Duplicar
+                </button>
+              ) : null}
+            </div>
 
             {!esNuevo ? (
               <button
                 type="button"
-                className="boton secundario"
-                onClick={() => alDuplicar?.(borrador)}
+                className="boton riesgo ancho"
+                style={{ marginTop: 'var(--space-5)' }}
+                onClick={() => alEliminar?.(borrador)}
               >
-                <Icono nombre="copy" />
-                Duplicar
+                <Icono nombre="trash" />
+                Eliminar
               </button>
             ) : null}
           </div>
-
-          {!esNuevo ? (
-            <button
-              type="button"
-              className="boton peligro ancho"
-              style={{ marginTop: 10 }}
-              onClick={() => alEliminar?.(borrador)}
-            >
-              <Icono nombre="trash" />
-              Eliminar recordatorio
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div style={{ height: 8 }} />
+        ) : null}
+      </div>
     </HojaModal>
   );
-}
-
-/** Quita las claves con valor indefinido para que no pisen los valores base. */
-function limpiarIndefinidos(objeto) {
-  return Object.fromEntries(Object.entries(objeto).filter(([, valor]) => valor !== undefined));
 }
 
 export default FormularioRecordatorio;

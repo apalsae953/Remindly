@@ -6,15 +6,29 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0"
     />
-    <meta name="description" content="Gestor de recordatorios con avisos, repeticiones y calendario" />
-    <meta name="theme-color" content="#6c5ce7" />
+    <meta name="description" content="Agenda de recordatorios con avisos en el móvil" />
+    <meta name="theme-color" content="#f6f3ec" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Recuerda" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/iconos/icono.svg" />
     <link rel="apple-touch-icon" href="/iconos/icono-192.png" />
+
+    <!--
+      Tipografía: Fraunces para las fechas y los títulos (serif editorial, en
+      redonda), Inter para la interfaz. Se precarga la conexión para que el
+      primer pintado no espere al DNS, y el service worker las cachea para que
+      a partir de la segunda visita funcionen sin conexión.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Inter:wght@400;500;600&display=swap"
+    />
+
     <title>Recuerda</title>
   </head>
   <body>

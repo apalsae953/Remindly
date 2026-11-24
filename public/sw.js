@@ -17,8 +17,13 @@
  *  4. Atender las acciones rapidas de la notificacion (completar y posponer).
  */
 
-const VERSION_CACHE = 'recuerda-v1';
+const VERSION_CACHE = 'recuerda-v2';
 const RECURSOS_BASE = ['/', '/index.html', '/manifest.webmanifest', '/iconos/icono.svg'];
+
+// Orígenes de las tipografías. Se cachean aparte porque son inmutables: una
+// vez descargadas, la aplicación tiene que poder abrirse sin conexión con su
+// tipografía correcta y no con la de respaldo del sistema.
+const ORIGENES_FUENTES = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 
 const NOMBRE_BD = 'recuerda-sw';
 const ALMACEN_AVISOS = 'avisos';
@@ -132,7 +137,28 @@ self.addEventListener('activate', (evento) => {
  */
 self.addEventListener('fetch', (evento) => {
   const peticion = evento.request;
-  if (peticion.method !== 'GET' || !peticion.url.startsWith(self.location.origin)) return;
+  if (peticion.method !== 'GET') return;
+
+  // Tipografías: primero la caché, porque nunca cambian para una misma URL.
+  if (ORIGENES_FUENTES.some((origen) => peticion.url.startsWith(origen))) {
+    evento.respondWith(
+      caches.match(peticion).then(
+        (enCache) =>
+          enCache ||
+          fetch(peticion).then((respuesta) => {
+            const copia = respuesta.clone();
+            caches
+              .open(VERSION_CACHE)
+              .then((cache) => cache.put(peticion, copia))
+              .catch(() => null);
+            return respuesta;
+          })
+      )
+    );
+    return;
+  }
+
+  if (!peticion.url.startsWith(self.location.origin)) return;
 
   evento.respondWith(
     fetch(peticion)

@@ -1,0 +1,160 @@
+/**
+ * Tokens de diseño de "Recuerda".
+ *
+ * Único sitio donde viven los valores literales. El resto de la aplicación
+ * los consume siempre por nombre, así que cambiar el tema o el acento es
+ * cuestión de tocar este archivo y nada más.
+ *
+ * Paleta en OKLCH: el canal de luminosidad es perceptual, de modo que subir
+ * o bajar un tono mantiene el contraste previsible entre claro y oscuro.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* --- Papel y tinta (tema claro) --- */
+  --color-paper: oklch(97% 0.009 85); /* papel crudo, ligeramente cálido */
+  --color-paper-2: oklch(94.5% 0.012 85); /* reposo de botones */
+  --color-paper-3: oklch(91% 0.014 85); /* pulsado */
+
+  --color-ink: oklch(24% 0.014 55); /* texto principal */
+  --color-ink-2: oklch(47% 0.012 55); /* texto secundario */
+  --color-ink-3: oklch(58% 0.012 60); /* horas, rótulos, ayudas */
+  --color-ink-4: oklch(72% 0.011 65); /* marcadores de posición */
+
+  --color-rule: oklch(89% 0.010 75); /* línea de un píxel entre filas */
+  --color-rule-fuerte: oklch(81% 0.012 72); /* bordes de campos y chips */
+
+  /* --- Acento: solo para lo que vence ahora --- */
+  --color-accent: oklch(53% 0.145 38); /* terracota */
+  --color-accent-borde: oklch(78% 0.07 40);
+  --color-accent-suave: oklch(95% 0.028 50);
+
+  /* --- Completado --- */
+  --color-hecho: oklch(50% 0.075 150); /* verde salvia apagado */
+  --color-hecho-borde: oklch(80% 0.05 150);
+
+  /* --- Foco y velo --- */
+  --color-foco: oklch(48% 0.14 250);
+  --color-velo: oklch(24% 0.014 55 / 0.28);
+
+  /* --- Categorías: la única mancha de color de la lista --- */
+  --cat-personal: oklch(55% 0.09 50);
+  --cat-trabajo: oklch(50% 0.085 250);
+  --cat-salud: oklch(52% 0.1 150);
+  --cat-casa: oklch(54% 0.07 95);
+  --cat-dinero: oklch(52% 0.085 200);
+  --cat-gente: oklch(55% 0.1 20);
+  --cat-ocio: oklch(56% 0.1 300);
+  --cat-otros: oklch(58% 0.012 70);
+
+  /* --- Tipografía --- */
+  --font-display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px: por debajo, iOS hace zoom en los campos */
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-display: clamp(2.25rem, 9vw, 3rem);
+
+  /* --- Espaciado: escala de 4 pt --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+  --space-gutter: 20px;
+
+  /* --- Medidas --- */
+  --medida-app: 640px;
+  --medida-hoja: 560px;
+  --columna-hora: 52px;
+  --ancho-contador: 68px; /* hueco del número en el contador de repetición */
+  --alto-compositor: 60px;
+  --toque: 44px; /* objetivo táctil mínimo */
+
+  /* --- Líneas y radios --- */
+  --rule: 1px;
+  --rule-grueso: 1.5px;
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  /* --- Sombra: una sola, y solo para separar la hoja del fondo --- */
+  --sombra-hoja: 0 -1px 0 var(--color-rule), 0 12px 40px oklch(24% 0.014 55 / 0.14);
+
+  /* --- Movimiento --- */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 300ms;
+
+  /* --- Capas --- */
+  --z-compositor: 30;
+  --z-tostada: 40;
+  --z-hoja: 50;
+  --z-banner: 60;
+
+  /* --- Zonas seguras del dispositivo --- */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Tema oscuro: tinta cálida, nunca negro puro                         */
+/* ------------------------------------------------------------------ */
+
+[data-tema='oscuro'] {
+  color-scheme: dark;
+
+  --color-paper: oklch(19% 0.012 60);
+  --color-paper-2: oklch(23% 0.013 60);
+  --color-paper-3: oklch(27% 0.014 60);
+
+  --color-ink: oklch(93% 0.012 85);
+  --color-ink-2: oklch(74% 0.013 80);
+  --color-ink-3: oklch(62% 0.013 75);
+  --color-ink-4: oklch(45% 0.012 70);
+
+  --color-rule: oklch(29% 0.012 65);
+  --color-rule-fuerte: oklch(39% 0.013 65);
+
+  --color-accent: oklch(72% 0.135 45);
+  --color-accent-borde: oklch(45% 0.09 42);
+  --color-accent-suave: oklch(26% 0.04 45);
+
+  --color-hecho: oklch(70% 0.09 152);
+  --color-hecho-borde: oklch(40% 0.06 152);
+
+  --color-foco: oklch(74% 0.12 245);
+  --color-velo: oklch(12% 0.01 60 / 0.6);
+
+  --cat-personal: oklch(72% 0.1 50);
+  --cat-trabajo: oklch(70% 0.095 250);
+  --cat-salud: oklch(70% 0.1 150);
+  --cat-casa: oklch(72% 0.08 95);
+  --cat-dinero: oklch(70% 0.09 200);
+  --cat-gente: oklch(72% 0.1 20);
+  --cat-ocio: oklch(72% 0.1 300);
+  --cat-otros: oklch(65% 0.012 70);
+
+  --sombra-hoja: 0 -1px 0 var(--color-rule), 0 12px 40px oklch(0% 0 0 / 0.5);
+}
+
+/* Márgenes más generosos en cuanto hay sitio. */
+@media (min-width: 480px) {
+  :root {
+    --space-gutter: 24px;
+  }
+}

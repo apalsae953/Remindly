@@ -65,6 +65,18 @@ function plegarLinea(linea) {
 /* Regla de repetición                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Horas enteras que caen dentro de una franja, incluida la que cruza la medianoche. */
+function horasDeFranja(franja) {
+  const desde = Number(String(franja.desde).split(':')[0]);
+  const hasta = Number(String(franja.hasta).split(':')[0]);
+  const horas = [];
+  for (let h = 0; h < 24; h += 1) {
+    const dentro = desde < hasta ? h >= desde && h <= hasta : h >= desde || h <= hasta;
+    if (dentro) horas.push(h);
+  }
+  return horas;
+}
+
 /** Traduce la repetición interna a una RRULE de iCalendar. */
 export function construirRRULE(repeticion) {
   if (!repeticion || repeticion.tipo === 'ninguna') return null;
@@ -74,15 +86,11 @@ export function construirRRULE(repeticion) {
   switch (r.tipo) {
     case 'horas':
       partes.push('FREQ=HOURLY', `INTERVAL=${r.intervalo}`);
+      // La franja se traduce con BYHOUR, que filtra las horas permitidas.
+      if (r.franja) partes.push(`BYHOUR=${horasDeFranja(r.franja).join(',')}`);
       break;
     case 'diaria':
       partes.push('FREQ=DAILY', `INTERVAL=${r.intervalo}`);
-      break;
-    case 'laborables':
-      partes.push('FREQ=WEEKLY', 'BYDAY=MO,TU,WE,TH,FR');
-      break;
-    case 'finsemana':
-      partes.push('FREQ=WEEKLY', 'BYDAY=SA,SU');
       break;
     case 'semanal':
       partes.push('FREQ=WEEKLY', `INTERVAL=${r.intervalo}`);
@@ -97,18 +105,23 @@ export function construirRRULE(repeticion) {
     case 'anual':
       partes.push('FREQ=YEARLY', `INTERVAL=${r.intervalo}`);
       break;
-    case 'personalizada': {
-      const frecuencias = {
-        dias: 'DAILY',
-        semanas: 'WEEKLY',
-        meses: 'MONTHLY',
-        anos: 'YEARLY'
-      };
-      partes.push(`FREQ=${frecuencias[r.unidad] || 'DAILY'}`, `INTERVAL=${r.intervalo}`);
-      break;
-    }
     default:
       return null;
+  }
+
+  /*
+   * Varias horas al día se expresan con BYHOUR y BYMINUTE, pero el estándar
+   * las combina entre sí: BYHOUR=9,15 con BYMINUTE=0,30 daría cuatro avisos,
+   * no dos. Por eso solo se exportan cuando todas comparten el mismo minuto;
+   * con minutos distintos se deja la primera hora, que es la de DTSTART, y el
+   * resto se queda en la aplicación.
+   */
+  if (r.tipo !== 'horas' && r.horas.length > 1) {
+    const partidas = r.horas.map((hora) => hora.split(':').map(Number));
+    const minutos = [...new Set(partidas.map(([, m]) => m))];
+    if (minutos.length === 1) {
+      partes.push(`BYHOUR=${partidas.map(([h]) => h).join(',')}`, `BYMINUTE=${minutos[0]}`);
+    }
   }
 
   if (r.fin?.tipo === 'fecha' && r.fin.fecha) {

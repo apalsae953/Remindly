@@ -12,7 +12,34 @@
  */
 
 import { aFechaISO, sumarDias } from './fechas.js';
-import { CATEGORIAS } from './constantes.js';
+import { REPARTOS_HORAS } from './constantes.js';
+import { horaAMinutos, minutosAHora } from './repeticion.js';
+
+const NUMEROS_ESCRITOS = { una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6 };
+
+/**
+ * Reparte N avisos a lo largo del día. Si hay un reparto típico para ese
+ * número se usa ese; si no, se espacian entre las 8:00 y las 22:00.
+ */
+function repartoDeHoras(veces) {
+  if (!Number.isFinite(veces) || veces < 2 || veces > 12) return null;
+  const tipico = REPARTOS_HORAS.find((reparto) => reparto.horas.length === veces);
+  if (tipico) return tipico.horas;
+
+  const paso = Math.round((14 * 60) / (veces - 1));
+  return Array.from({ length: veces }, (sinUsar, i) => minutosAHora(8 * 60 + i * paso));
+}
+
+/**
+ * Recoloca una lista de horas para que empiece en otra, conservando los huecos
+ * entre avisos: "3 veces al día a las 10" son las 10, las 16 y las 22.
+ */
+function recolocarHoras(horas, primera) {
+  const inicio = horaAMinutos(primera);
+  if (inicio === null) return horas;
+  const base = horas.map(horaAMinutos);
+  return base.map((minutos) => minutosAHora(inicio + (minutos - base[0])));
+}
 
 const DIAS = {
   domingo: 0,
@@ -93,14 +120,45 @@ export function interpretarTexto(entrada) {
     resultado.prioridad = 'urgente';
   } else if (consumir(/\b(importante|prioritario)\b/i, 'prioridad alta')) {
     resultado.prioridad = 'alta';
-  } else if (consumir(/\b(cuando pueda|sin prisa|opcional)\b/i, 'prioridad baja')) {
-    resultado.prioridad = 'baja';
   }
 
   /* ---------------- Repetición ---------------- */
 
+  // "cada 2 horas de 8 a 22" limita la repetición a una franja del día.
+  const cadaHorasFranja = texto.match(
+    /\bcada\s+(\d{1,2})\s*(?:h|horas?)\s+(?:de|entre)\s+(?:las\s+)?(\d{1,2})(?::(\d{2}))?\s+(?:a|hasta|y)\s+(?:las\s+)?(\d{1,2})(?::(\d{2}))?\b/i
+  );
+  if (cadaHorasFranja) {
+    const [, cada, horaDesde, minDesde, horaHasta, minHasta] = cadaHorasFranja;
+    resultado.repeticion = {
+      tipo: 'horas',
+      intervalo: Number(cada),
+      franja: {
+        desde: minutosAHora(Number(horaDesde) * 60 + Number(minDesde || 0)),
+        hasta: minutosAHora(Number(horaHasta) * 60 + Number(minHasta || 0))
+      }
+    };
+    resultado.detectado.push(`cada ${cada} horas, de ${horaDesde} a ${horaHasta}`);
+    texto = texto.replace(cadaHorasFranja[0], ' ');
+  }
+
+  // "3 veces al día" reparte varios avisos dentro del mismo día.
+  const vecesPorDia = texto.match(
+    /\b(\d{1,2}|una|dos|tres|cuatro|cinco|seis)\s+veces?\s+al\s+d[ií]a\b/i
+  );
+  if (vecesPorDia) {
+    const bruto = vecesPorDia[1].toLowerCase();
+    const veces = NUMEROS_ESCRITOS[bruto] ?? Number(bruto);
+    const reparto = repartoDeHoras(veces);
+    if (reparto) {
+      resultado.repeticion = { tipo: 'diaria', intervalo: 1, horas: reparto };
+      resultado.detectado.push(`${veces} veces al día`);
+      texto = texto.replace(vecesPorDia[0], ' ');
+    }
+  }
+
   const cadaHoras = texto.match(/\bcada\s+(\d{1,2})\s*(h|horas?)\b/i);
-  if (cadaHoras) {
+  if (!resultado.repeticion && cadaHoras) {
     resultado.repeticion = { tipo: 'horas', intervalo: Number(cadaHoras[1]) };
     resultado.detectado.push(`cada ${cadaHoras[1]} horas`);
     texto = texto.replace(cadaHoras[0], ' ');
@@ -117,15 +175,15 @@ export function interpretarTexto(entrada) {
     if (consumir(/\b(cada d[ií]a|todos los d[ií]as|diariamente|a diario)\b/i, 'cada día')) {
       resultado.repeticion = { tipo: 'diaria', intervalo: 1 };
     } else if (consumir(/\b(cada semana|semanalmente|todas las semanas)\b/i, 'cada semana')) {
-      resultado.repeticion = { tipo: 'personalizada', intervalo: 1, unidad: 'semanas' };
+      resultado.repeticion = { tipo: 'semanal', intervalo: 1 };
     } else if (consumir(/\b(cada mes|mensualmente|todos los meses)\b/i, 'cada mes')) {
       resultado.repeticion = { tipo: 'mensual', intervalo: 1 };
     } else if (consumir(/\b(cada a[nñ]o|anualmente|todos los a[nñ]os)\b/i, 'cada año')) {
       resultado.repeticion = { tipo: 'anual', intervalo: 1 };
     } else if (consumir(/\b(entre semana|de lunes a viernes|laborables)\b/i, 'de lunes a viernes')) {
-      resultado.repeticion = { tipo: 'laborables', intervalo: 1 };
+      resultado.repeticion = { tipo: 'semanal', intervalo: 1, diasSemana: [1, 2, 3, 4, 5] };
     } else if (consumir(/\b(fines de semana|findes?)\b/i, 'fines de semana')) {
-      resultado.repeticion = { tipo: 'finsemana', intervalo: 1 };
+      resultado.repeticion = { tipo: 'semanal', intervalo: 1, diasSemana: [6, 0] };
     }
   }
 
@@ -257,22 +315,73 @@ export function interpretarTexto(entrada) {
     }
   }
 
+  /* ---------------- Horas del reparto ---------------- */
+
+  /*
+   * Si la frase traía un reparto ("3 veces al día") y además una hora
+   * concreta, la lista se recoloca para arrancar en esa hora conservando los
+   * huecos. Sin hora concreta, la primera del reparto hace de hora.
+   */
+  if (resultado.repeticion?.horas?.length > 1) {
+    const horas = resultado.hora
+      ? recolocarHoras(resultado.repeticion.horas, resultado.hora)
+      : resultado.repeticion.horas;
+    resultado.repeticion = { ...resultado.repeticion, horas: [...horas].sort() };
+    if (!resultado.hora) [resultado.hora] = resultado.repeticion.horas;
+  }
+
   /* ---------------- Categoría ---------------- */
 
   const textoPlano = sinAcentos(texto.toLowerCase());
   const pistas = {
-    trabajo: ['reunion', 'jefe', 'oficina', 'cliente', 'informe', 'proyecto', 'curro'],
-    salud: ['medico', 'dentista', 'analitica', 'consulta', 'revision'],
-    medicacion: ['pastilla', 'medicamento', 'jarabe', 'antibiotico', 'ibuprofeno'],
-    compras: ['comprar', 'supermercado', 'lista de la compra', 'mercadona'],
-    pagos: ['pagar', 'factura', 'recibo', 'alquiler', 'hipoteca', 'impuesto'],
-    ejercicio: ['gimnasio', 'correr', 'entrenar', 'padel', 'natacion'],
-    cumpleanos: ['cumple', 'cumpleanos', 'aniversario'],
-    llamadas: ['llamar', 'telefono', 'whatsapp'],
-    mascotas: ['perro', 'gato', 'veterinario'],
-    coche: ['coche', 'itv', 'taller', 'gasolina', 'seguro del coche'],
-    plantas: ['regar', 'plantas', 'maceta'],
-    estudios: ['examen', 'estudiar', 'clase', 'entrega', 'practica']
+    trabajo: [
+      'reunion',
+      'jefe',
+      'oficina',
+      'cliente',
+      'informe',
+      'proyecto',
+      'curro',
+      'examen',
+      'estudiar',
+      'clase',
+      'entrega'
+    ],
+    salud: [
+      'medico',
+      'dentista',
+      'analitica',
+      'consulta',
+      'pastilla',
+      'medicamento',
+      'jarabe',
+      'gimnasio',
+      'correr',
+      'entrenar',
+      'padel',
+      'natacion'
+    ],
+    casa: [
+      'comprar',
+      'supermercado',
+      'compra',
+      'basura',
+      'lavadora',
+      'limpiar',
+      'regar',
+      'plantas',
+      'maceta',
+      'perro',
+      'gato',
+      'veterinario',
+      'coche',
+      'itv',
+      'taller',
+      'gasolina'
+    ],
+    dinero: ['pagar', 'factura', 'recibo', 'alquiler', 'hipoteca', 'impuesto', 'banco'],
+    gente: ['llamar', 'telefono', 'whatsapp', 'cumple', 'cumpleanos', 'aniversario', 'quedar'],
+    ocio: ['viaje', 'vuelo', 'hotel', 'cine', 'concierto', 'cena', 'reservar']
   };
 
   for (const [categoria, palabras] of Object.entries(pistas)) {
@@ -282,11 +391,9 @@ export function interpretarTexto(entrada) {
     }
   }
 
-  // Si el usuario escribió el nombre exacto de una categoría, manda ese.
-  const categoriaExacta = CATEGORIAS.find((c) =>
-    textoPlano.includes(sinAcentos(c.nombre.toLowerCase()))
-  );
-  if (categoriaExacta) resultado.categoria = categoriaExacta.id;
+  // Ojo: no se busca el nombre literal de la categoría. Ahora se llaman
+  // "Casa", "Gente" u "Ocio", palabras demasiado corrientes: "pagar la luz de
+  // casa" acabaría en Casa en vez de en Dinero.
 
   /* ---------------- Título limpio ---------------- */
 

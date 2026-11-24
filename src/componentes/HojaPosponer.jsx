@@ -1,24 +1,23 @@
 /**
- * Hoja de posposición rápida.
+ * Posposición rápida.
  *
- * Además de los saltos fijos permite elegir una hora concreta del mismo día,
- * que es lo que hace falta cuando sabes exactamente cuándo podrás atenderlo.
+ * Saltos fijos arriba y, debajo, una hora concreta del día: es lo que hace
+ * falta cuando ya sabes exactamente cuándo vas a poder atenderlo.
  */
 
 import { useState } from 'react';
-import Icono from './Icono.jsx';
 import HojaModal from './HojaModal.jsx';
 import { OPCIONES_POSPONER } from '../utilidades/constantes.js';
 import { aHoraISO, sumarMinutos } from '../utilidades/fechas.js';
 
 export function HojaPosponer({ abierta, recordatorio, alPosponer, alCerrar }) {
-  const [horaConcreta, setHoraConcreta] = useState(() => aHoraISO(sumarMinutos(new Date(), 60)));
+  const [hora, setHora] = useState(() => aHoraISO(sumarMinutos(new Date(), 60)));
 
   if (!recordatorio) return null;
 
   /** Convierte la hora elegida en minutos desde ahora, saltando al día siguiente si ya pasó. */
   const posponerHastaHora = () => {
-    const [horas, minutos] = horaConcreta.split(':').map(Number);
+    const [horas, minutos] = hora.split(':').map(Number);
     const destino = new Date();
     destino.setHours(horas, minutos, 0, 0);
     if (destino.getTime() <= Date.now()) destino.setDate(destino.getDate() + 1);
@@ -31,56 +30,52 @@ export function HojaPosponer({ abierta, recordatorio, alPosponer, alCerrar }) {
     <HojaModal
       abierta={abierta}
       titulo="Posponer"
-      icono="clock-rotate-left"
       alCerrar={alCerrar}
       pie={
-        <button type="button" className="boton secundario ancho" onClick={alCerrar}>
+        <button type="button" className="boton contorno ancho" onClick={alCerrar}>
           Cancelar
         </button>
       }
     >
-      <p className="texto-ayuda" style={{ marginTop: 0, marginBottom: 16 }}>
-        <Icono nombre="circle-info" /> Se volverá a avisar de “{recordatorio.titulo}” dentro de:
-      </p>
+      <div className="campo">
+        <p className="campo-nota" style={{ marginTop: 0 }}>
+          Volver a avisar de “{recordatorio.titulo}” dentro de:
+        </p>
 
-      <div className="rejilla-opciones">
-        {OPCIONES_POSPONER.map((opcion) => (
-          <button
-            key={opcion.minutos}
-            type="button"
-            className="opcion-cuadro"
-            onClick={() => alPosponer(recordatorio.id, opcion.minutos)}
-          >
-            <Icono nombre={opcion.icono} />
-            <span>{opcion.nombre}</span>
-          </button>
-        ))}
+        <div className="chips" style={{ marginTop: 'var(--space-4)' }}>
+          {OPCIONES_POSPONER.map((opcion) => (
+            <button
+              key={opcion.minutos}
+              type="button"
+              className="chip"
+              onClick={() => alPosponer(recordatorio.id, opcion.minutos)}
+            >
+              {opcion.nombre}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="separador" />
-
       <div className="campo">
-        <div className="campo-etiqueta">
-          <Icono nombre="clock" />
-          O a una hora concreta
-        </div>
+        <span className="campo-rotulo">O a una hora concreta</span>
         <div className="fila-campos">
           <input
             type="time"
             className="entrada"
-            value={horaConcreta}
-            onChange={(e) => setHoraConcreta(e.target.value)}
+            value={hora}
+            aria-label="Hora a la que avisar"
+            onChange={(e) => setHora(e.target.value)}
           />
           <button
             type="button"
-            className="boton principal"
+            className="boton solido"
             style={{ flex: '0 0 auto' }}
             onClick={posponerHastaHora}
           >
-            <Icono nombre="check" />
+            Posponer
           </button>
         </div>
-        <p className="texto-ayuda">Si la hora ya ha pasado, se avisará mañana a esa hora.</p>
+        <p className="campo-nota">Si esa hora ya ha pasado, se avisará mañana.</p>
       </div>
     </HojaModal>
   );

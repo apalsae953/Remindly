@@ -1,20 +1,18 @@
 /**
  * Hoja deslizante reutilizable.
  *
- * En el móvil sube desde abajo (patrón habitual en aplicaciones nativas) y en
- * pantallas grandes se centra como un diálogo. Cierra con Escape, tocando
- * fuera o arrastrando el asa hacia abajo.
+ * En el móvil sube desde abajo; en pantallas anchas se centra como un
+ * diálogo. Cierra con Escape, tocando fuera o arrastrando el asa.
  */
 
 import { useEffect, useRef, useState } from 'react';
 import Icono from './Icono.jsx';
 
-export function HojaModal({ abierta, titulo, icono, alCerrar, pie, children }) {
-  const referenciaHoja = useRef(null);
+export function HojaModal({ abierta, titulo, alCerrar, pie, children }) {
   const [arrastre, setArrastre] = useState(0);
   const inicioArrastre = useRef(null);
 
-  // Cerrar con la tecla Escape y bloquear el desplazamiento del fondo.
+  // Cierra con Escape y bloquea el desplazamiento del fondo.
   useEffect(() => {
     if (!abierta) return undefined;
 
@@ -34,7 +32,7 @@ export function HojaModal({ abierta, titulo, icono, alCerrar, pie, children }) {
 
   if (!abierta) return null;
 
-  /* Gesto de arrastre sobre el asa para cerrar la hoja. */
+  /* Gesto de arrastre sobre el asa para cerrar. */
   const alEmpezar = (evento) => {
     inicioArrastre.current = evento.touches[0].clientY;
   };
@@ -63,7 +61,6 @@ export function HojaModal({ abierta, titulo, icono, alCerrar, pie, children }) {
     >
       <div
         className="hoja"
-        ref={referenciaHoja}
         style={arrastre ? { transform: `translateY(${arrastre}px)`, transition: 'none' } : undefined}
       >
         <div
@@ -74,9 +71,8 @@ export function HojaModal({ abierta, titulo, icono, alCerrar, pie, children }) {
         />
 
         <header className="hoja-cabecera">
-          {icono ? <Icono nombre={icono} style={{ color: 'var(--principal-claro)' }} /> : null}
-          <h2>{titulo}</h2>
-          <button type="button" className="boton-icono" onClick={alCerrar} aria-label="Cerrar">
+          <h2 className="hoja-titulo">{titulo}</h2>
+          <button type="button" className="icono-boton" onClick={alCerrar} aria-label="Cerrar">
             <Icono nombre="xmark" />
           </button>
         </header>

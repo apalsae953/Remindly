@@ -19,7 +19,12 @@ import {
   leerAlmacen,
   solicitarAlmacenamientoPersistente
 } from '../utilidades/almacenamiento.js';
-import { crearRecordatorio, momentoEfectivo, normalizarRecordatorio } from '../utilidades/modelo.js';
+import {
+  alinearConLaSerie,
+  crearRecordatorio,
+  momentoEfectivo,
+  normalizarRecordatorio
+} from '../utilidades/modelo.js';
 import { avanzarRecordatorio, esRepetitivo } from '../utilidades/repeticion.js';
 import { aFechaISO } from '../utilidades/fechas.js';
 
@@ -140,7 +145,8 @@ function reductor(estado, accion) {
             ? { ...r, completado: false, completadoEn: null, actualizado: Date.now() }
             : r
         ),
-        historial: estado.historial.filter((h) => h.idRecordatorio !== accion.id || !h.reciente),
+        // El historial no se toca: devolver algo a pendientes no borra que
+        // estuvo completado en su dia.
         deshacer: null
       };
     }
@@ -300,7 +306,7 @@ export function ProveedorRecordatorios({ children }) {
       crear: (parcial) =>
         despachar({
           tipo: 'CREAR',
-          recordatorio: crearRecordatorio(parcial, estado.ajustes)
+          recordatorio: alinearConLaSerie(crearRecordatorio(parcial, estado.ajustes))
         }),
       actualizar: (id, cambios) => despachar({ tipo: 'ACTUALIZAR', id, cambios }),
       eliminar: (id) => despachar({ tipo: 'ELIMINAR', id }),

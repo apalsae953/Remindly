@@ -1,14 +1,14 @@
 /**
  * Vista mensual.
  *
- * Cada celda muestra puntos de color con las categorías que hay ese día,
- * incluyendo las ocurrencias futuras de los recordatorios repetitivos, que se
- * calculan al vuelo sin guardar nada.
+ * Cada celda lleva hasta tres puntos con las categorías de ese día, incluidas
+ * las ocurrencias futuras de lo que se repite, que se calculan al vuelo sin
+ * guardar nada.
  */
 
 import { useMemo, useState } from 'react';
 import Icono from './Icono.jsx';
-import ListaRecordatorios, { EstadoVacio } from './ListaRecordatorios.jsx';
+import ListaDiario, { Vacio } from './ListaDiario.jsx';
 import { DIAS_SEMANA, obtenerCategoria } from '../utilidades/constantes.js';
 import { ocurrenciasEntre } from '../utilidades/repeticion.js';
 import {
@@ -20,7 +20,7 @@ import {
   generarRejillaMes,
   inicioDelDia
 } from '../utilidades/fechas.js';
-import { ordenarRecordatorios } from '../utilidades/modelo.js';
+import { momentoEfectivo } from '../utilidades/modelo.js';
 
 export function VistaCalendario({ recordatorios, ...manejadores }) {
   const hoy = new Date();
@@ -30,10 +30,7 @@ export function VistaCalendario({ recordatorios, ...manejadores }) {
 
   const celdas = useMemo(() => generarRejillaMes(ano, mes), [ano, mes]);
 
-  /**
-   * Índice de ocurrencias por día para todo el rango visible.
-   * Se recalcula solo al cambiar de mes o al tocar los recordatorios.
-   */
+  /** Índice de ocurrencias por día para todo el rango visible. */
   const porDia = useMemo(() => {
     if (!celdas.length) return new Map();
 
@@ -47,8 +44,8 @@ export function VistaCalendario({ recordatorios, ...manejadores }) {
         ocurrenciasEntre(recordatorio, desde, hasta, 60).forEach((fecha) => {
           const clave = aFechaISO(fecha);
           if (!mapa.has(clave)) mapa.set(clave, []);
-          // Se guarda una copia situada en esa fecha para que la tarjeta
-          // muestre la hora correcta de la ocurrencia, no la de la serie.
+          // Copia situada en esa fecha, para que la fila muestre la hora de la
+          // ocurrencia y no la de la serie original.
           mapa.get(clave).push({
             ...recordatorio,
             fecha: clave,
@@ -64,7 +61,7 @@ export function VistaCalendario({ recordatorios, ...manejadores }) {
   }, [recordatorios, celdas]);
 
   const delDia = useMemo(
-    () => ordenarRecordatorios(porDia.get(diaElegido) || [], 'fecha'),
+    () => (porDia.get(diaElegido) || []).sort((a, b) => momentoEfectivo(a) - momentoEfectivo(b)),
     [porDia, diaElegido]
   );
 
@@ -74,106 +71,83 @@ export function VistaCalendario({ recordatorios, ...manejadores }) {
     setMes(referencia.getMonth());
   };
 
-  const irAHoy = () => {
-    setAno(hoy.getFullYear());
-    setMes(hoy.getMonth());
-    setDiaElegido(aFechaISO(hoy));
-  };
-
   return (
     <>
-      <div className="seccion" style={{ marginTop: 16 }}>
-        <div className="calendario">
-          <div className="calendario-cabecera">
-            <button
-              type="button"
-              className="boton-icono"
-              onClick={() => cambiarMes(-1)}
-              aria-label="Mes anterior"
-            >
-              <Icono nombre="chevron-left" />
-            </button>
+      <div className="calendario-barra">
+        <h2 className="calendario-mes">{capitalizar(formatearMes(new Date(ano, mes, 1)))}</h2>
 
-            <h3>{capitalizar(formatearMes(new Date(ano, mes, 1)))}</h3>
-
-            <button
-              type="button"
-              className="boton-icono"
-              onClick={() => cambiarMes(1)}
-              aria-label="Mes siguiente"
-            >
-              <Icono nombre="chevron-right" />
-            </button>
-          </div>
-
-          <div className="calendario-dias-semana">
-            {DIAS_SEMANA.map((dia) => (
-              <span key={dia.indice}>{dia.corto}</span>
-            ))}
-          </div>
-
-          <div className="calendario-rejilla">
-            {celdas.map((celda) => {
-              const elementos = porDia.get(celda.claveISO) || [];
-              // Solo se pintan tres puntos como mucho para no ensuciar la celda.
-              const colores = [
-                ...new Set(elementos.map((r) => obtenerCategoria(r.categoria).color))
-              ].slice(0, 3);
-
-              const clases = [
-                'celda-dia',
-                celda.delMes ? '' : 'fuera',
-                celda.esHoy ? 'hoy' : '',
-                diaElegido === celda.claveISO ? 'seleccionado' : ''
-              ]
-                .filter(Boolean)
-                .join(' ');
-
-              return (
-                <button
-                  key={celda.claveISO}
-                  type="button"
-                  className={clases}
-                  onClick={() => setDiaElegido(celda.claveISO)}
-                  aria-label={`${celda.fecha.getDate()}, ${elementos.length} recordatorios`}
-                >
-                  <span>{celda.fecha.getDate()}</span>
-                  <span className="celda-puntos">
-                    {colores.map((color) => (
-                      <i key={color} style={{ background: color }} />
-                    ))}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
+        <div className="en-linea" style={{ gap: 'var(--space-1)' }}>
           <button
             type="button"
-            className="boton secundario ancho"
-            style={{ marginTop: 14 }}
-            onClick={irAHoy}
+            className="icono-boton"
+            onClick={() => cambiarMes(-1)}
+            aria-label="Mes anterior"
           >
-            <Icono nombre="calendar-check" />
-            Volver a hoy
+            <Icono nombre="chevron-left" />
+          </button>
+          <button
+            type="button"
+            className="icono-boton"
+            onClick={() => cambiarMes(1)}
+            aria-label="Mes siguiente"
+          >
+            <Icono nombre="chevron-right" />
           </button>
         </div>
       </div>
 
-      <section className="seccion">
-        <div className="seccion-titulo">
-          <h2>
-            <Icono nombre="calendar-day" />
-            {capitalizar(etiquetaDia(new Date(`${diaElegido}T12:00:00`)))}
-          </h2>
-          <span className="contador">{delDia.length}</span>
-        </div>
+      <div className="calendario-semana">
+        {DIAS_SEMANA.map((dia) => (
+          <span key={dia.indice}>{dia.corto}</span>
+        ))}
+      </div>
 
-        <ListaRecordatorios
+      <div className="calendario-rejilla">
+        {celdas.map((celda) => {
+          const elementos = porDia.get(celda.claveISO) || [];
+          const colores = [
+            ...new Set(elementos.map((r) => obtenerCategoria(r.categoria).color))
+          ].slice(0, 3);
+
+          const clases = [
+            'celda',
+            celda.delMes ? '' : 'fuera',
+            celda.esHoy ? 'hoy' : ''
+          ]
+            .filter(Boolean)
+            .join(' ');
+
+          return (
+            <button
+              key={celda.claveISO}
+              type="button"
+              className={clases}
+              aria-pressed={diaElegido === celda.claveISO}
+              onClick={() => setDiaElegido(celda.claveISO)}
+              aria-label={`${celda.fecha.getDate()}, ${elementos.length} recordatorios`}
+            >
+              <span>{celda.fecha.getDate()}</span>
+              <span className="celda-puntos">
+                {colores.map((color) => (
+                  <i key={color} style={{ background: color }} />
+                ))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="jornada">
+        <h2 className="jornada-titulo">
+          {capitalizar(etiquetaDia(new Date(`${diaElegido}T12:00:00`)))}
+          <span className="regla" />
+          <span>{delDia.length}</span>
+        </h2>
+
+        <ListaDiario
           recordatorios={delDia}
-          agrupar={false}
-          mostrarFecha={false}
-          vacio={<EstadoVacio icono="calendar-check" titulo="Día libre" texto="No hay nada previsto." />}
+          modo="plano"
+          vacio={<Vacio titulo="Día libre" texto="No hay nada previsto para este día." />}
           {...manejadores}
         />
       </section>
